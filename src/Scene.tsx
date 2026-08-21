@@ -68,8 +68,9 @@ function Terrain() {
 
 // Scroll fraction where the dragon's approach finishes and it settles into its hover
 const HOVER_START = 0.78;
-const FAR_ENTRY_DIST = 120; // starts far back toward the user-facing side of the camera path
-const HOVER_DIST = 16; // closes in until it is near the camera's resting spot
+const FAR_ENTRY_DIST = 92; // starts far back toward the user-facing side of the camera path
+const HOVER_DIST = 12; // closes in until it is near the camera's resting spot
+const DRAGON_LEFT_OFFSET = 12;
 const dummy = new THREE.Object3D();
 const worldUp = new THREE.Vector3(0, 1, 0);
 
@@ -81,8 +82,11 @@ function dragonPositionAt(curve: THREE.CatmullRomCurve3, t: number) {
   const approachT = THREE.MathUtils.smoothstep(t, 0, HOVER_START);
   const dist = THREE.MathUtils.lerp(FAR_ENTRY_DIST, HOVER_DIST, approachT);
   const rearDir = tangent.clone().multiplyScalar(-1).normalize();
-  const sideDir = new THREE.Vector3().crossVectors(worldUp, rearDir).normalize();
-  const weaveFade = 1 - THREE.MathUtils.smoothstep(t, HOVER_START - 0.12, HOVER_START);
+  const sideDir = new THREE.Vector3()
+    .crossVectors(worldUp, rearDir)
+    .normalize();
+  const weaveFade =
+    1 - THREE.MathUtils.smoothstep(t, HOVER_START - 0.12, HOVER_START);
   const weaveAmp = THREE.MathUtils.lerp(22, 5, approachT) * weaveFade;
   const zigzag = Math.sin(t * Math.PI * 7) * weaveAmp;
   const lift = 1 + Math.sin(t * Math.PI * 5) * 2.2 * weaveFade;
@@ -90,8 +94,8 @@ function dragonPositionAt(curve: THREE.CatmullRomCurve3, t: number) {
   return camPos
     .clone()
     .add(rearDir.multiplyScalar(dist))
-    .add(sideDir.multiplyScalar(zigzag))
-    .add(new THREE.Vector3(0, lift, 0));
+    .add(sideDir.multiplyScalar(zigzag + DRAGON_LEFT_OFFSET))
+    .add(new THREE.Vector3(0, lift - 4, 0));
 }
 
 // Single pose function used by both the dragon and the camera's lookAt target, so the two
@@ -134,7 +138,7 @@ function dragonPoseAt(curve: THREE.CatmullRomCurve3, t: number) {
 // chase distance the flight offset above puts the camera at (dragon subtends ~23° of the 55°
 // vertical FOV) — the model's own authoring scale varies per export, so this is a deliberate
 // framing choice, not a reflection of the asset's "real" size.
-const DRAGON_TARGET_SIZE = 16; // world units for the model's largest bbox dimension
+const DRAGON_TARGET_SIZE = 19; // world units for the model's largest bbox dimension
 
 function Dragon({ curve }: { curve: THREE.CatmullRomCurve3 }) {
   const group = useRef<THREE.Group>(null!);
@@ -252,8 +256,6 @@ function CameraRig({ curve }: { curve: THREE.CatmullRomCurve3 }) {
     // continuous, so this holds still there with no separate blend/snap needed.
     const ct = Math.min(t, HOVER_START);
     const camPos = curve.getPointAt(ct);
-    // Look straight at the dragon's own position (same computation Dragon uses), so the two
-    // always agree regardless of how the approach/hover framing is tuned.
     const lookTarget = dragonPoseAt(curve, t).pos;
 
     camera.position.copy(camPos);
