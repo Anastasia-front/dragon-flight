@@ -15,6 +15,8 @@ import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.j
 
 gsap.registerPlugin(ScrollTrigger);
 
+const DRAGON_MODEL_PATH = `${import.meta.env.BASE_URL}models/dragon.glb`;
+
 // Scroll progress store (0 -> 1), driven by GSAP outside R3F
 const scrollState = { progress: 0 };
 
@@ -186,7 +188,7 @@ function Dragon({ curve }: { curve: THREE.CatmullRomCurve3 }) {
   const lastProgress = useRef(scrollState.progress);
   const scrollDirection = useRef<1 | -1>(1);
 
-  const gltf = useGLTF("/models/dragon.glb", true, true);
+  const gltf = useGLTF(DRAGON_MODEL_PATH, true, true);
   const scene = useMemo(
     () => cloneSkeleton(gltf.scene) as THREE.Group,
     [gltf.scene],
@@ -289,7 +291,7 @@ function Dragon({ curve }: { curve: THREE.CatmullRomCurve3 }) {
   );
 }
 
-useGLTF.preload("/models/dragon.glb");
+useGLTF.preload(DRAGON_MODEL_PATH);
 
 function LandingShelf({
   curve,
