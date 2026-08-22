@@ -125,11 +125,20 @@ function dragonPositionAt(curve: THREE.CatmullRomCurve3, t: number) {
 // Single pose function used by both the dragon and the camera's lookAt target, so the two
 // always agree on where the dragon actually is. The dragon now flies on the user-facing side
 // of the camera path, weaving left and right while drawing closer, then eases into a hover.
-function dragonPoseAt(curve: THREE.CatmullRomCurve3, t: number) {
+function dragonPoseAt(
+  curve: THREE.CatmullRomCurve3,
+  t: number,
+  direction: 1 | -1 = 1,
+) {
   const ct = Math.min(t, HOVER_START);
   const camPos = curve.getPointAt(ct);
   const pos = dragonPositionAt(curve, t);
-  const nextPos = dragonPositionAt(curve, Math.min(t + 0.01, HOVER_START));
+  const lookAheadT = THREE.MathUtils.clamp(
+    t + 0.01 * direction,
+    0,
+    HOVER_START,
+  );
+  const nextPos = dragonPositionAt(curve, lookAheadT);
   const travelDir = nextPos.sub(pos).normalize();
   if (travelDir.lengthSq() < 0.0001) {
     travelDir.copy(new THREE.Vector3(1, 0, 0));
@@ -148,7 +157,7 @@ function dragonPoseAt(curve: THREE.CatmullRomCurve3, t: number) {
     HOVER_START - 0.16,
     HOVER_START,
   );
-  const faceT = Math.max(startFaceT, endFaceT);
+  const faceT = direction === 1 ? Math.max(startFaceT, endFaceT) : 0;
   const quat = travelQuat.clone().slerp(faceCameraQuat, faceT);
 
   return { pos, quat, turnT: faceT };
@@ -174,6 +183,8 @@ function Dragon({ curve }: { curve: THREE.CatmullRomCurve3 }) {
   const group = useRef<THREE.Group>(null!);
   const modelScale = useRef<THREE.Group>(null!);
   const inner = useRef<THREE.Group>(null!);
+  const lastProgress = useRef(scrollState.progress);
+  const scrollDirection = useRef<1 | -1>(1);
 
   const gltf = useGLTF("/models/dragon.glb", true, true);
   const scene = useMemo(
@@ -226,6 +237,11 @@ function Dragon({ curve }: { curve: THREE.CatmullRomCurve3 }) {
 
   useFrame((state) => {
     const t = scrollState.progress;
+    const delta = t - lastProgress.current;
+    if (Math.abs(delta) > 0.0005) {
+      scrollDirection.current = delta > 0 ? 1 : -1;
+      lastProgress.current = t;
+    }
     const takeoffT = THREE.MathUtils.smoothstep(t, 0.03, TAKEOFF_END);
     const landingT = THREE.MathUtils.smoothstep(
       t,
@@ -234,10 +250,18 @@ function Dragon({ curve }: { curve: THREE.CatmullRomCurve3 }) {
     );
     const airT = takeoffT * (1 - landingT);
     const bob = Math.sin(state.clock.elapsedTime * 1.4) * 0.6 * airT;
-    const { pos, quat, turnT } = dragonPoseAt(curve, t);
+    const { pos, quat, turnT } = dragonPoseAt(
+      curve,
+      t,
+      scrollDirection.current,
+    );
 
     group.current.position.copy(pos).setY(pos.y + bob);
-    group.current.quaternion.copy(quat);
+    if (t > HOVER_START - 0.04) {
+      group.current.quaternion.slerp(quat, 0.08);
+    } else {
+      group.current.quaternion.copy(quat);
+    }
     // Gentle roll while approaching, fully damped out by the time it turns into profile — a
     // hovering dragon banking side to side would fight the "hovering in place" read.
     group.current.rotation.z +=
