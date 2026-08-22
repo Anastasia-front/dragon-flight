@@ -38,11 +38,20 @@ function Terrain() {
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i);
       const y = pos.getY(i);
+      const worldZ = -y;
       const dist = Math.hypot(x, y);
       const ridge = Math.sin(x * 0.05) * Math.cos(y * 0.04) * 8;
       const jag = (Math.random() - 0.5) * 2;
       const falloff = Math.max(0, 1 - dist / 220);
-      const h = (ridge + jag) * falloff * 6;
+      const pathClearance =
+        THREE.MathUtils.smoothstep(worldZ, 8, 34) *
+        (1 - THREE.MathUtils.smoothstep(worldZ, 48, 78)) *
+        (1 - THREE.MathUtils.smoothstep(Math.abs(x - 6), 16, 42));
+      const h = THREE.MathUtils.lerp(
+        (ridge + jag) * falloff * 6,
+        -3,
+        pathClearance,
+      );
       pos.setZ(i, h);
     }
     g.computeVertexNormals();
@@ -69,8 +78,11 @@ function Terrain() {
 // Scroll fraction where the dragon's approach finishes and it settles into its hover
 const HOVER_START = 0.78;
 const FAR_ENTRY_DIST = 92; // starts far back toward the user-facing side of the camera path
-const HOVER_DIST = 12; // closes in until it is near the camera's resting spot
+const HOVER_DIST = 15; // closes in until it is near the camera's resting spot
 const DRAGON_LEFT_OFFSET = 12;
+const LANDING_SURFACE_Y = -2.35;
+const LANDING_CENTER_Y = 2.25;
+const TAKEOFF_END = 0.16;
 const dummy = new THREE.Object3D();
 const worldUp = new THREE.Vector3(0, 1, 0);
 
@@ -89,19 +101,33 @@ function dragonPositionAt(curve: THREE.CatmullRomCurve3, t: number) {
     1 - THREE.MathUtils.smoothstep(t, HOVER_START - 0.12, HOVER_START);
   const weaveAmp = THREE.MathUtils.lerp(22, 5, approachT) * weaveFade;
   const zigzag = Math.sin(t * Math.PI * 7) * weaveAmp;
-  const lift = 1 + Math.sin(t * Math.PI * 5) * 2.2 * weaveFade;
+  const flightLift = THREE.MathUtils.lerp(8, 3.25, approachT);
+  const takeoffT = THREE.MathUtils.smoothstep(t, 0.03, TAKEOFF_END);
+  const landingT = THREE.MathUtils.smoothstep(
+    t,
+    HOVER_START - 0.14,
+    HOVER_START,
+  );
+  const lift =
+    flightLift + Math.sin(t * Math.PI * 5) * 2.2 * weaveFade - landingT * 3.25;
 
-  return camPos
+  const pos = camPos
     .clone()
     .add(rearDir.multiplyScalar(dist))
     .add(sideDir.multiplyScalar(zigzag + DRAGON_LEFT_OFFSET))
     .add(new THREE.Vector3(0, lift - 4, 0));
+  pos.y = THREE.MathUtils.lerp(LANDING_CENTER_Y, pos.y, takeoffT);
+  pos.y = THREE.MathUtils.lerp(pos.y, LANDING_CENTER_Y, landingT);
+
+  return pos;
 }
 
 // Single pose function used by both the dragon and the camera's lookAt target, so the two
 // always agree on where the dragon actually is. The dragon now flies on the user-facing side
 // of the camera path, weaving left and right while drawing closer, then eases into a hover.
 function dragonPoseAt(curve: THREE.CatmullRomCurve3, t: number) {
+  const ct = Math.min(t, HOVER_START);
+  const camPos = curve.getPointAt(ct);
   const pos = dragonPositionAt(curve, t);
   const nextPos = dragonPositionAt(curve, Math.min(t + 0.01, HOVER_START));
   const travelDir = nextPos.sub(pos).normalize();
@@ -113,15 +139,19 @@ function dragonPoseAt(curve: THREE.CatmullRomCurve3, t: number) {
   dummy.lookAt(pos.clone().add(travelDir));
   const travelQuat = dummy.quaternion.clone();
 
-  dummy.lookAt(pos.clone().add(new THREE.Vector3(1, 0, 0))); // profile: nose along world +X
-  const profileQuat = dummy.quaternion.clone();
+  dummy.lookAt(camPos);
+  const faceCameraQuat = dummy.quaternion.clone();
 
-  // Turn into profile over the last stretch of the approach rather than snapping the instant
-  // it reaches the hover point.
-  const turnT = THREE.MathUtils.smoothstep(t, HOVER_START - 0.1, HOVER_START);
-  const quat = travelQuat.clone().slerp(profileQuat, turnT);
+  const startFaceT = 1 - THREE.MathUtils.smoothstep(t, 0.03, TAKEOFF_END);
+  const endFaceT = THREE.MathUtils.smoothstep(
+    t,
+    HOVER_START - 0.16,
+    HOVER_START,
+  );
+  const faceT = Math.max(startFaceT, endFaceT);
+  const quat = travelQuat.clone().slerp(faceCameraQuat, faceT);
 
-  return { pos, quat, turnT };
+  return { pos, quat, turnT: faceT };
 }
 
 // Mountain Dragon (rigged, with a flight/moves animation): approaches from the distance facing
@@ -196,9 +226,14 @@ function Dragon({ curve }: { curve: THREE.CatmullRomCurve3 }) {
 
   useFrame((state) => {
     const t = scrollState.progress;
-    // Keep bobbing through the hover too — it's hovering, not landed, so it should still read
-    // as actively flying in place rather than settling motionless.
-    const bob = Math.sin(state.clock.elapsedTime * 1.4) * 0.6;
+    const takeoffT = THREE.MathUtils.smoothstep(t, 0.03, TAKEOFF_END);
+    const landingT = THREE.MathUtils.smoothstep(
+      t,
+      HOVER_START - 0.14,
+      HOVER_START,
+    );
+    const airT = takeoffT * (1 - landingT);
+    const bob = Math.sin(state.clock.elapsedTime * 1.4) * 0.6 * airT;
     const { pos, quat, turnT } = dragonPoseAt(curve, t);
 
     group.current.position.copy(pos).setY(pos.y + bob);
@@ -206,7 +241,7 @@ function Dragon({ curve }: { curve: THREE.CatmullRomCurve3 }) {
     // Gentle roll while approaching, fully damped out by the time it turns into profile — a
     // hovering dragon banking side to side would fight the "hovering in place" read.
     group.current.rotation.z +=
-      Math.sin(state.clock.elapsedTime * 1.4) * 0.08 * (1 - turnT);
+      Math.sin(state.clock.elapsedTime * 1.4) * 0.08 * airT * (1 - turnT);
   });
 
   return (
@@ -232,14 +267,32 @@ function Dragon({ curve }: { curve: THREE.CatmullRomCurve3 }) {
 
 useGLTF.preload("/models/dragon.glb");
 
-// A rocky spire near where the dragon settles into its hover — background scenery, the dragon
-// no longer lands on it.
-function LandingPeak() {
+function LandingShelf({
+  curve,
+  t,
+  scale = 1,
+}: {
+  curve: THREE.CatmullRomCurve3;
+  t: number;
+  scale?: number;
+}) {
+  const landingPos = useMemo(() => dragonPositionAt(curve, t), [curve, t]);
+
   return (
-    <mesh position={[0, -4, -14]}>
-      <coneGeometry args={[7, 18, 6]} />
-      <meshStandardMaterial color="#161b22" roughness={1} flatShading />
-    </mesh>
+    <group position={[landingPos.x, LANDING_SURFACE_Y - 0.35, landingPos.z]}>
+      <mesh rotation={[0, Math.PI / 7, 0]} receiveShadow>
+        <cylinderGeometry args={[11 * scale, 15 * scale, 0.7, 7]} />
+        <meshStandardMaterial color="#171d26" roughness={1} flatShading />
+      </mesh>
+      <mesh
+        position={[0, -1.3, 0]}
+        rotation={[0, Math.PI / 7, 0]}
+        receiveShadow
+      >
+        <cylinderGeometry args={[15 * scale, 24 * scale, 2.2, 7]} />
+        <meshStandardMaterial color="#111720" roughness={1} flatShading />
+      </mesh>
+    </group>
   );
 }
 
@@ -296,7 +349,8 @@ function SceneContent() {
       <hemisphereLight args={["#4d6180", "#141210", 0.85]} />
 
       <Terrain />
-      <LandingPeak />
+      <LandingShelf curve={curve} t={0} scale={0.85} />
+      <LandingShelf curve={curve} t={HOVER_START} />
       <Dragon curve={curve} />
       <CameraRig curve={curve} />
 
