@@ -256,7 +256,7 @@ function Dragon({ curve }: { curve: THREE.CatmullRomCurve3 }) {
           units regardless of the model's (asset-dependent) auto-computed scale. */}
       <pointLight
         position={[0, 15, 15]}
-        intensity={250}
+        intensity={85}
         color="#cdd8e8"
         distance={0}
         decay={2}
@@ -293,6 +293,29 @@ function LandingShelf({
         <meshStandardMaterial color="#111720" roughness={1} flatShading />
       </mesh>
     </group>
+  );
+}
+
+function LandingContactLight({ curve }: { curve: THREE.CatmullRomCurve3 }) {
+  const position = useMemo(() => {
+    const landingPos = dragonPositionAt(curve, HOVER_START);
+    const camPos = curve.getPointAt(HOVER_START);
+    const frontDir = camPos.sub(landingPos).normalize();
+
+    return landingPos
+      .clone()
+      .add(frontDir.multiplyScalar(8))
+      .add(new THREE.Vector3(0, 1.5, 0));
+  }, [curve]);
+
+  return (
+    <pointLight
+      position={position}
+      intensity={82}
+      color="#d6c3a4"
+      distance={24}
+      decay={2}
+    />
   );
 }
 
@@ -340,17 +363,23 @@ function SceneContent() {
   return (
     <>
       <fog attach="fog" args={["#1c2431", 20, 160]} />
-      <ambientLight intensity={0.75} color="#6a7c95" />
+      <ambientLight intensity={0.9} color="#71849f" />
       <directionalLight
-        position={[-30, 40, 20]}
-        intensity={1.5}
-        color="#b8c6da"
+        position={[-45, 65, 35]}
+        intensity={1.25}
+        color="#d4deee"
       />
-      <hemisphereLight args={["#4d6180", "#141210", 0.85]} />
+      <hemisphereLight args={["#607795", "#18140f", 1.05]} />
+      <directionalLight
+        position={[35, 8, 75]}
+        intensity={0.3}
+        color="#b88a5a"
+      />
 
       <Terrain />
       <LandingShelf curve={curve} t={0} scale={0.85} />
       <LandingShelf curve={curve} t={HOVER_START} />
+      <LandingContactLight curve={curve} />
       <Dragon curve={curve} />
       <CameraRig curve={curve} />
 
