@@ -36,24 +36,47 @@ export function LandingContactLight({
 }: {
   curve: THREE.CatmullRomCurve3;
 }) {
-  const position = useMemo(() => {
+  const { position, facePosition, faceTarget } = useMemo(() => {
     const landingPos = dragonPositionAt(curve, HOVER_START);
     const camPos = curve.getPointAt(HOVER_START);
     const frontDir = camPos.sub(landingPos).normalize();
 
-    return landingPos
+    const groundLightPos = landingPos
       .clone()
-      .add(frontDir.multiplyScalar(8))
+      .add(frontDir.clone().multiplyScalar(8))
       .add(new THREE.Vector3(0, 1.5, 0));
+    const dragonFaceLightPos = landingPos
+      .clone()
+      .add(frontDir.multiplyScalar(14))
+      .add(new THREE.Vector3(0, 5, 0));
+    const dragonFaceTarget = landingPos.clone().add(new THREE.Vector3(0, 2.2, 0));
+
+    return {
+      position: groundLightPos,
+      facePosition: dragonFaceLightPos,
+      faceTarget: dragonFaceTarget,
+    };
   }, [curve]);
 
   return (
-    <pointLight
-      position={position}
-      intensity={82}
-      color="#d6c3a4"
-      distance={24}
-      decay={2}
-    />
+    <>
+      <pointLight
+        position={position}
+        intensity={82}
+        color="#d6c3a4"
+        distance={24}
+        decay={2}
+      />
+      <spotLight
+        position={facePosition}
+        target-position={faceTarget}
+        intensity={110}
+        color="#d6c3a4"
+        distance={32}
+        angle={0.42}
+        penumbra={0.75}
+        decay={2}
+      />
+    </>
   );
 }
