@@ -1,4 +1,9 @@
-import { Sparkles, useAnimations, useGLTF } from "@react-three/drei";
+import {
+  Sparkles,
+  useAnimations,
+  useGLTF,
+  useProgress,
+} from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
 // Temporarily disabled — see the EffectComposer comment further down.
 // import {
@@ -9,7 +14,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 // } from "@react-three/postprocessing";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
 
@@ -366,7 +371,7 @@ function CameraRig({ curve }: { curve: THREE.CatmullRomCurve3 }) {
   return null;
 }
 
-function SceneContent() {
+function SceneContent({ onReady }: { onReady: () => void }) {
   // Straight dolly down the z-axis: starts back near the viewer (z=100) and eases
   // in toward the scene (z=0 and just beyond, into the landing peak). Only mild y/x
   // drift, so there's no lateral weaving — the "no sharp turns" ask, taken further.
@@ -385,6 +390,10 @@ function SceneContent() {
       0.5,
     );
   }, []);
+
+  useEffect(() => {
+    onReady();
+  }, [onReady]);
 
   return (
     <>
@@ -440,6 +449,7 @@ function SceneContent() {
 }
 
 export default function Scene() {
+  const [ready, setReady] = useState(false);
   useScrollDriver(4000);
 
   return (
@@ -458,12 +468,68 @@ export default function Scene() {
           gl={{ antialias: true }}
         >
           <color attach="background" args={["#1c2431"]} />
-          <SceneContent />
+          <Suspense fallback={null}>
+            <SceneContent onReady={() => setReady(true)} />
+          </Suspense>
         </Canvas>
       </div>
-      <Overlay />
+      {!ready && <LoadingOverlay />}
+      {ready && <Overlay />}
       <RestartButton />
     </>
+  );
+}
+
+function LoadingOverlay() {
+  const { progress } = useProgress();
+  const shownProgress = Math.min(99, Math.round(progress));
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 20,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "1.25rem",
+        background: "#1c2431",
+        color: "#e8e2d8",
+        fontFamily: "Georgia, serif",
+        letterSpacing: "0.15em",
+        textTransform: "uppercase",
+        pointerEvents: "none",
+      }}
+    >
+      <div
+        style={{
+          fontSize: "1rem",
+          textShadow: "0 0 20px rgba(255,90,30,0.35)",
+        }}
+      >
+        LOADING SCENE {shownProgress}%
+      </div>
+      <div
+        style={{
+          width: "min(280px, 62vw)",
+          height: "1px",
+          background: "rgba(232,226,216,0.2)",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            width: `${shownProgress}%`,
+            height: "100%",
+            background: "#e8e2d8",
+            boxShadow: "0 0 16px rgba(255,90,30,0.55)",
+            transition: "width 0.25s ease",
+          }}
+        />
+      </div>
+    </div>
   );
 }
 
