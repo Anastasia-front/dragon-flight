@@ -10,6 +10,7 @@ export const HOVER_DIST = 15;
 export const DRAGON_LEFT_OFFSET = 12;
 export const LANDING_SURFACE_Y = -2.35;
 export const LANDING_CENTER_Y = 2.25;
+export const START_LANDING_CENTER_Y = 1.35;
 export const TAKEOFF_END = 0.16;
 export const DRAGON_TARGET_SIZE = 19;
 
@@ -38,15 +39,16 @@ export function dragonPositionAt(curve: THREE.CatmullRomCurve3, t: number) {
     HOVER_START - 0.14,
     HOVER_START,
   );
+  const startGroundT = 1 - takeoffT;
   const lift =
     flightLift + Math.sin(t * Math.PI * 5) * 2.2 * weaveFade - landingT * 3.25;
 
   const pos = camPos
     .clone()
     .add(rearDir.multiplyScalar(dist))
-    .add(sideDir.multiplyScalar(zigzag + DRAGON_LEFT_OFFSET))
+    .add(sideDir.multiplyScalar(zigzag + DRAGON_LEFT_OFFSET - startGroundT * 18))
     .add(new THREE.Vector3(0, lift - 4, 0));
-  pos.y = THREE.MathUtils.lerp(LANDING_CENTER_Y, pos.y, takeoffT);
+  pos.y = THREE.MathUtils.lerp(START_LANDING_CENTER_Y, pos.y, takeoffT);
   pos.y = THREE.MathUtils.lerp(pos.y, LANDING_CENTER_Y, landingT);
 
   return pos;
