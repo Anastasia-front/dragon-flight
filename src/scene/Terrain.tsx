@@ -33,8 +33,8 @@ export function Terrain() {
         mountainBump(x, worldZ, -68, 174, 112, 92, 28) +
         mountainBump(x, worldZ, -32, 162, 96, 78, 16);
       const leftRouteRidge =
-        mountainBump(x, worldZ, -58, 116, 44, 64, 48) +
-        mountainBump(x, worldZ, -54, 58, 40, 52, 42);
+        mountainBump(x, worldZ, -78, 116, 44, 64, 48) +
+        mountainBump(x, worldZ, -74, 58, 40, 52, 42);
       const rightMountain =
         mountainBump(x, worldZ, 78, 180, 54, 52, 48) +
         mountainBump(x, worldZ, 98, 150, 60, 66, 52);
