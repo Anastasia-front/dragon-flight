@@ -49,7 +49,10 @@ export function LandingContactLight({
       .clone()
       .add(frontDir.multiplyScalar(14))
       .add(new THREE.Vector3(0, 5, 0));
-    const dragonFaceTarget = landingPos.clone().add(new THREE.Vector3(0, 2.2, 0));
+    const dragonFaceTarget = new THREE.Object3D();
+    dragonFaceTarget.position.copy(
+      landingPos.clone().add(new THREE.Vector3(0, 2.4, 0)),
+    );
 
     return {
       position: groundLightPos,
@@ -60,6 +63,7 @@ export function LandingContactLight({
 
   return (
     <>
+      <primitive object={faceTarget} />
       <pointLight
         position={position}
         intensity={82}
@@ -69,8 +73,8 @@ export function LandingContactLight({
       />
       <spotLight
         position={facePosition}
-        target-position={faceTarget}
-        intensity={110}
+        target={faceTarget}
+        intensity={135}
         color="#d6c3a4"
         distance={32}
         angle={0.42}

@@ -31,6 +31,27 @@ export function Dragon({ curve }: { curve: THREE.CatmullRomCurve3 }) {
       const mesh = obj as THREE.Mesh;
       if (mesh.isMesh) {
         mesh.frustumCulled = false;
+        mesh.material = Array.isArray(mesh.material)
+          ? mesh.material.map((material) => material.clone())
+          : mesh.material.clone();
+
+        const materials = Array.isArray(mesh.material)
+          ? mesh.material
+          : [mesh.material];
+
+        materials.forEach((material) => {
+          if (
+            material instanceof THREE.MeshStandardMaterial ||
+            material instanceof THREE.MeshPhongMaterial
+          ) {
+            material.emissive.set("#241b13");
+            material.emissiveIntensity = Math.max(
+              material.emissiveIntensity,
+              0.08,
+            );
+            material.needsUpdate = true;
+          }
+        });
       }
     });
 
@@ -93,10 +114,10 @@ export function Dragon({ curve }: { curve: THREE.CatmullRomCurve3 }) {
         </group>
       </group>
       <pointLight
-        position={[0, 15, 15]}
-        intensity={85}
-        color="#cdd8e8"
-        distance={0}
+        position={[4, 8, 10]}
+        intensity={115}
+        color="#d8c2a2"
+        distance={34}
         decay={2}
       />
     </group>
